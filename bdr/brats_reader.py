@@ -12,6 +12,7 @@ class BRATS_Reader():
         self.LGG_root = datapath + '/LGG'
         self.p_list = []
         self.get_original_input_shape()
+        self.faults = 0
     
     
     def fetch_hgg_patients_paths(self):
@@ -29,13 +30,14 @@ class BRATS_Reader():
         lgg_patients = self.fetch_lgg_patients_paths()
         return hgg_patients + lgg_patients
     
+    
     def get_original_input_shape(self):
         paths = self.fetch_hgg_patients_paths()
-        print("Moooods: ", paths[0])
         mods = os.listdir(paths[0])
         path_to_mods = paths[0] + '/' + mods[0]
         patient = nib.load(path_to_mods).get_fdata()
         self.original_input_shape = patient.shape
+       
         
     def read_patient_data(self, path_to_patient):
         p_files = os.listdir(path_to_patient)
@@ -51,14 +53,15 @@ class BRATS_Reader():
             if f.endswith('t1ce.nii.gz'):
                 img[1] = nib.load(path).get_fdata()
             if f.endswith('seg.nii.gz'):
-                img[4] = nib.load(path).get_fdata()
+                img[4] = self.correct_labels(nib.load(path).get_fdata())
         
         return img
+    
     
     def show_random_patients(self, dataset, times):
         for i in range(times):
             p = random.randint(0, len(dataset) - 1)
-            s = random.randint(60, 100)
+            s = random.randint(30, 65)
             self.show_patient(dataset[p], s, p)
             
     
@@ -88,3 +91,25 @@ class BRATS_Reader():
             dataset[i] = self.read_patient_data(p_list[i])
             
         return dataset
+    
+    
+    def crop_dataset(self, dataset):
+        return dataset[:, :, 40:200, 40:200, 30:120]
+    
+    
+    def correct_labels(self, seg):
+        ch4 = seg == 4
+        seg[ch4] = 3
+        
+        return seg
+    
+    
+    def update_faults(self, img):
+        seg_nz = np.count_nonzero(img[4, :, :, :])
+        img_nz = np.count_nonzero(img[:4, :, :, :])
+        
+        if seg_nz > 0 and img_nz == 0:
+            self.faults += 1
+        
+        
+        
